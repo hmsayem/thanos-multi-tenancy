@@ -39,7 +39,7 @@ kubectl label namespace demo tenant_id=demo
 ```
 
 
-### 5. Deploy Databases
+## 5. Deploy Databases
 
 Deploy the databases with monitoring enabled in the tenant's namespace. OpenTelemetry will collect metrics using the ServiceMonitors.
 
