@@ -1,0 +1,146 @@
+clusterName: ""
+collectors:
+  daemon:
+    image:
+      repository: hmsayem/otelcol-dev
+      tag: 0.2.0
+    suffix: agent
+    enabled: true
+    scrape_configs_file: "examples/prometheus-otel/kubelet_scrape_configs.yaml"
+    labels:
+      otel-collector-type: daemonset
+    targetAllocator:
+      enabled: true
+      serviceAccount: targetallocator
+      image: ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:main
+      allocationStrategy: per-node
+      prometheusCR:
+        enabled: true
+        podMonitorSelector: {}
+        scrapeInterval: "30s"
+        serviceMonitorSelector: {}
+    config:
+      exporters:
+        otlp:
+          endpoint: opentelemetry-kube-stack-gateway-collector:4317   
+          tls:
+            insecure: true
+        debug:
+          verbosity: detailed
+      processors:
+         k8sattributes:
+            extract:
+              labels:
+              - from: namespace
+                key: tenant_id
+                tag_name: tenant_id
+              - from: pod
+                key: app.kubernetes.io/name
+                tag_name: service.name
+              - from: pod
+                key: k8s-app
+                tag_name: service.name
+              - from: pod
+                key: app.kubernetes.io/instance
+                tag_name: k8s.app.instance
+              - from: pod
+                key: app.kubernetes.io/version
+                tag_name: service.version
+              - from: pod
+                key: app.kubernetes.io/component
+                tag_name: k8s.app.component
+      service:
+        pipelines:
+          metrics:
+            receivers: [prometheus]
+            processors: [k8sattributes]
+            exporters: [otlp]
+          traces: null
+          logs: null 
+    presets:
+      logsCollection:
+        enabled: false
+      kubeletMetrics:
+        enabled: false
+      hostMetrics:
+        enabled: false
+      kubernetesAttributes:
+        enabled: true
+  cluster:
+    suffix: gateway
+    enabled: true
+    labels:
+      otel-collector-type: deployment
+    image:
+      repository: hmsayem/otelcol-dev
+      tag: 0.2.0
+    presets:
+      clusterMetrics:
+        enabled: false
+    config:
+      extensions:
+        headers_setter:
+          headers:
+            - action: insert
+              key: THANOS-TENANT
+              from_context: tenant_id
+      processors:
+        batch:
+          metadata_keys:
+            - tenant_id
+#        groupbyattrs:
+#          keys: [ tenant_id ]
+        context:
+          actions:
+            - action: upsert
+              key: tenant_id
+              value: default-tenant
+              from_attribute: tenant_id
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: 0.0.0.0:4317
+            http:
+              endpoint: 0.0.0.0:4318
+      exporters:
+        prometheusremotewrite:
+          endpoint: "http://thanos-receive-router.thanos.svc.cluster.local:19291/api/v1/receive"
+          tls:
+            insecure: true
+          auth:
+            authenticator: headers_setter
+      service:
+        extensions: [ headers_setter ]
+        pipelines:
+          metrics: 
+            receivers: [otlp]
+            processors: [context]
+            exporters: [prometheusremotewrite]
+          traces: null
+          logs: null
+
+instrumentation:
+  enabled: false
+opAMPBridge:
+  enabled: false
+kubernetesServiceMonitors:
+  enabled: true
+kubeApiServer:
+  enabled: false
+kubelet:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeDns:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+nodeExporter:
+  enabled: false
