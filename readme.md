@@ -46,24 +46,57 @@ Deploy the databases with monitoring enabled in the tenant's namespace. OpenTele
 
 ## 6. Deploy Thanos
 
+
+### Deploy Minio
+
+```bash
+helm repo add minio https://operator.min.io/
+````
+```bash
+helm upgrade --install --namespace minio-operator \
+  --create-namespace minio minio/operator \
+  --set operator.replicaCount=1 \
+  --wait
 ```
-kubectl apply -f ./kube-thanos/manifests/
+
+#### Accessing MinIO
+
+- Access Key: `minio`
+- Secret Key: `minio123`
+- Endpoint: `http://minio.minio.svc.cluster.local:80`
+
+
+### Create Thanos Storage Secret
+
+```bash
+kubectl -n thanos create secret generic thanos-objstore-config --from-file=thanos-storage-config.yaml=./thanos/s3.yaml
+```
+
+### Deploy Thanos Manifests
+```
+kubectl create ns thanos
+kubectl apply -f ./thanos/kube-thanos/manifests/
 
 ```
 
 ## 7. Deploy Opentelmetry Stack
 
-```bash
+```
+ kubectl apply -f targetallocator-rbac.yaml
+```
 
-helm install opentelemetry-kube-stack -n monitoring oci://registry-1.docker.io/hmsayem/opentelemetry-kube-stack \
+```bash
+helm install opentelemetry-kube-stack -n monitoring open-telemetry/opentelemetry-kube-stack \
 --set opentelemetry-operator.admissionWebhooks.certManager.enabled=false \
 --set admissionWebhooks.autoGenerateCert.enabled=true \
 --values=./values.yaml
 ```
   
 
-## 8. Test Setup
+
+## 8. Query metrics via Thanos Querier
 
 ```bash
-kubectl port-forward -n thanos service/thanos-query 9090:9090
+ kubectl port-forward svc/thanos-query -n thanos 9090:9090
 ```
+Visit http://localhost:9090 and execute a test query (e.g., up).
