@@ -72,7 +72,7 @@ helm upgrade --install --namespace minio-operator \
 kubectl -n thanos create secret generic thanos-objstore-config --from-file=thanos-storage-config.yaml=./thanos/s3.yaml
 ```
 
-### Deploy Thanos Manifests
+### Deploy Thanos Components
 ```
 kubectl create ns thanos
 kubectl apply -f ./thanos/kube-thanos/manifests/
